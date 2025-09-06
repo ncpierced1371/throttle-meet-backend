@@ -1,17 +1,3 @@
-<<<<<<< HEAD
-import { Router } from 'express';
-const router = Router();
-
-// Placeholder for routes endpoints
-router.get('/', (req, res) => {
-  res.json({
-    success: true,
-    data: { routes: [] }
-  });
-});
-
-export default router;
-=======
 import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/db.js";
 import { z } from "zod";
@@ -106,4 +92,4 @@ export async function routeRoutes(app: FastifyInstance) {
     return { waypoints };
   });
 }
->>>>>>> 6008042 (feat: serverless-ready Fastify backend, Vercel integration, and workflow cleanup)
+
