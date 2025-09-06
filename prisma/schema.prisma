@@ -1,0 +1,316 @@
+// prisma/schema.prisma
+// Throttle Meet — Prisma schema (PostgreSQL / Neon)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// -------------------- Enums --------------------
+
+enum EventType {
+  TRACK_DAY
+  CAR_MEET
+  CRUISE
+  AUTOCROSS
+  DRAG_RACE
+  SOCIAL
+}
+
+enum RouteCategory {
+  SCENIC
+  PERFORMANCE
+  TRACK_ACCESS
+  MOUNTAIN
+  COASTAL
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum SocialVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum GroupRole {
+  MEMBER
+  MODERATOR
+  ORGANIZER
+  ADMIN
+}
+
+/// -------------------- Core Models --------------------
+
+model User {
+  id          String  @id @default(uuid())
+  email       String  @unique @db.VarChar(320)
+  username    String? @unique @db.VarChar(50)
+  displayName String? @db.VarChar(120)
+  bio         String? @db.Text
+  avatarUrl   String?
+  homeCity    String?
+  homeCountry String?
+  unitsMetric Boolean @default(false)
+  isPrivate   Boolean @default(false)
+
+  vehicles          Vehicle[]
+  posts             SocialPost[]
+  eventsOrganized   Event[]            @relation("EventOrganizer")
+  eventParticipants EventParticipant[]
+  groupsOwned       Group[]            @relation("GroupOwner")
+  groupMembers      GroupMember[]
+  media             Media[]
+  locations         LocationRecord[]
+  routesAuthored    Route[]            @relation("RouteAuthor")
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  Session   Session[]
+}
+
+model Vehicle {
+  id       String  @id @default(uuid())
+  userId   String
+  make     String  @db.VarChar(60)
+  model    String  @db.VarChar(60)
+  year     Int?
+  color    String? @db.VarChar(40)
+  trim     String? @db.VarChar(60)
+  notes    String? @db.Text
+  photoUrl String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId])
+}
+
+model SocialPost {
+  id           String           @id @default(uuid())
+  authorId     String
+  text         String?          @db.Text
+  visibility   SocialVisibility @default(PUBLIC)
+  likeCount    Int              @default(0)
+  commentCount Int              @default(0)
+  hashtags     String[]         @db.Text
+  eventId      String?
+  routeId      String?
+
+  author User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media  Media[]
+  event  Event?  @relation(fields: [eventId], references: [id])
+  route  Route?  @relation(fields: [routeId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([authorId])
+  @@index([eventId])
+  @@index([routeId])
+}
+
+model Media {
+  id          String    @id @default(uuid())
+  ownerId     String
+  type        MediaType
+  url         String
+  thumbnail   String?
+  width       Int?
+  height      Int?
+  durationSec Int?
+  caption     String?   @db.VarChar(280)
+
+  postId  String?
+  eventId String?
+  routeId String?
+
+  owner User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  post  SocialPost? @relation(fields: [postId], references: [id])
+  event Event?      @relation(fields: [eventId], references: [id])
+  route Route?      @relation(fields: [routeId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([ownerId])
+  @@index([postId])
+  @@index([eventId])
+  @@index([routeId])
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String    @db.VarChar(120)
+  description String?   @db.Text
+  type        EventType
+  organizerId String
+  startTime   DateTime  @db.Timestamptz(6)
+  endTime     DateTime? @db.Timestamptz(6)
+
+  locationName String?  @db.VarChar(200)
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  address      String?  @db.VarChar(300)
+  city         String?  @db.VarChar(100)
+  region       String?  @db.VarChar(100)
+  country      String?  @db.VarChar(100)
+
+  capacity   Int?
+  isPaid     Boolean @default(false)
+  priceCents Int?
+  currency   String? @db.VarChar(3)
+
+  weatherNote      String? @db.VarChar(140)
+  qrCheckinEnabled Boolean @default(true)
+
+  organizer    User               @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  participants EventParticipant[]
+  media        Media[]
+  posts        SocialPost[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  Group     Group?   @relation(fields: [groupId], references: [id])
+  groupId   String?
+
+  @@index([organizerId])
+  @@index([type, startTime])
+}
+
+model EventParticipant {
+  id      String  @id @default(uuid())
+  eventId String
+  userId  String
+  isLead  Boolean @default(false)
+  isSweep Boolean @default(false)
+  isStaff Boolean @default(false)
+
+  checkinAt DateTime? @db.Timestamptz(6)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+model Route {
+  id             String        @id @default(uuid())
+  title          String        @db.VarChar(140)
+  description    String?       @db.Text
+  category       RouteCategory
+  difficulty     Difficulty    @default(BEGINNER)
+  distanceKm     Decimal?      @db.Decimal(10, 2)
+  estDurationMin Int?
+  authorId       String
+  ratingAvg      Decimal?      @db.Decimal(3, 2)
+  ratingCount    Int           @default(0)
+
+  waypoints RouteWaypoint[]
+  media     Media[]
+  posts     SocialPost[]
+
+  author User @relation("RouteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([authorId])
+  @@index([category, difficulty])
+}
+
+model RouteWaypoint {
+  id        String  @id @default(uuid())
+  routeId   String
+  order     Int
+  name      String? @db.VarChar(120)
+  latitude  Decimal @db.Decimal(10, 7)
+  longitude Decimal @db.Decimal(10, 7)
+  note      String? @db.VarChar(200)
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, order])
+  @@index([routeId, order])
+}
+
+model Group {
+  id          String  @id @default(uuid())
+  name        String  @unique @db.VarChar(120)
+  slug        String  @unique @db.VarChar(140)
+  description String? @db.Text
+  ownerId     String
+  isPrivate   Boolean @default(false)
+  coverUrl    String?
+
+  owner   User          @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members GroupMember[]
+  events  Event[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([ownerId])
+}
+
+model GroupMember {
+  id      String    @id @default(uuid())
+  groupId String
+  userId  String
+  role    GroupRole @default(MEMBER)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model LocationRecord {
+  id         String   @id @default(uuid())
+  userId     String
+  timestamp  DateTime @default(now()) @db.Timestamptz(6)
+  latitude   Decimal  @db.Decimal(10, 7)
+  longitude  Decimal  @db.Decimal(10, 7)
+  speedKph   Decimal? @db.Decimal(6, 2)
+  headingDeg Decimal? @db.Decimal(6, 2)
+  accuracyM  Decimal? @db.Decimal(6, 2)
+  source     String?  @db.VarChar(40)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([userId])
+}
