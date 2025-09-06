@@ -1,5 +1,5 @@
 import fp from "fastify-plugin";
-import { verify } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 export default fp(async function authPlugin(app) {
   app.decorate("requireAuth", async (req, reply) => {
@@ -10,7 +10,7 @@ export default fp(async function authPlugin(app) {
     }
     const token = authHeader.slice(7);
     try {
-      const user = verify(token, process.env.JWT_SECRET);
+  const user = jwt.verify(token, process.env.JWT_SECRET);
       req.user = user;
     } catch (err) {
       reply.code(401).send({ error: "Invalid token" });
