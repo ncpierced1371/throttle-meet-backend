@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Files and directories to ignore
 node_modules/
 dist/
@@ -20,9 +20,4 @@ coverage/
 .nyc_output/
 temp/
 tmp/
-=======
-node_modules/
-dist/
-.env
-.DS_Store
->>>>>>> 6008042 (feat: serverless-ready Fastify backend, Vercel integration, and workflow cleanup)
+.vercel
