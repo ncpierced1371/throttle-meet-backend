@@ -5,11 +5,11 @@ import rateLimit from "@fastify/rate-limit";
 import cors from "@fastify/cors";
 
 import { authPlugin } from "./plugins/auth.js";
-import { authRoutes } from "./routes/auth.js";
 import { profileRoutes } from "./routes/profiles.js";
 import { healthRoutes } from "./routes/health.js";
-import { eventRoutes } from "./routes/events.js";
-import { routeRoutes } from "./routes/routes.js";
+import { authRoutes } from "./routes/auth.js"; // Ensure named export
+import { eventRoutes } from "./routes/events.js"; // Ensure named export
+import { routeRoutes } from "./routes/routes.js"; // Ensure named export
 import { mediaRoutes } from "./routes/media.js";
 
 export function buildApp() {
