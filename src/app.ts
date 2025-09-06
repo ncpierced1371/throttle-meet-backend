@@ -32,5 +32,10 @@ export function buildApp() {
   app.register(routeRoutes);
   app.register(mediaRoutes);
 
+  // Handle favicon requests to prevent 504 timeouts
+  app.get('/favicon.ico', async (req, reply) => {
+    reply.code(204).send();
+  });
+
   return app;
 }
