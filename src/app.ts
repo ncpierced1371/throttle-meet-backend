@@ -4,7 +4,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import cors from "@fastify/cors";
 
-import { authPlugin } from "./plugins/auth.js";
+import { authPlugin } from "./plugins/auth";
 import { profileRoutes } from "./routes/profiles.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js"; // Ensure named export
