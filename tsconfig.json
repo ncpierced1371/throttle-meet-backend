@@ -1,34 +1,21 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "outDir": "dist",
-    "rootDir": "src",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "commonjs",
-      "lib": ["ES2022"],
-      "outDir": "./dist",
-      "rootDir": "./src",
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true,
-      "moduleResolution": "node",
-      "allowSyntheticDefaultImports": true,
-      "resolveJsonModule": true,
-      "declaration": true,
-      "declarationMap": true,
-      "sourceMap": true
-    },
-    "include": ["src/**/*", "api/**/*"],
-    "exclude": ["node_modules", "dist", "**/*.test.ts"]
-  }
+  "include": ["src/**/*", "api/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

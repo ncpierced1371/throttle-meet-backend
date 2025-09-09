@@ -1,7 +1,8 @@
 // src/middleware/cors.ts
 // CORS middleware
 
-export const corsMiddleware = (req, res, next) => {
+import { Request, Response, NextFunction } from 'express';
+export const corsMiddleware = (req: Request, res: Response, next: NextFunction) => {
   // Implement CORS logic here
   next();
 };

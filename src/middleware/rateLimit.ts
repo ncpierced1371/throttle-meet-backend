@@ -1,7 +1,9 @@
 // src/middleware/rateLimit.ts
 // Rate limiting middleware
 
-export const rateLimitMiddleware = (req, res, next) => {
+import { Request, Response, NextFunction } from 'express';
+
+export const rateLimitMiddleware = (req: Request, res: Response, next: NextFunction) => {
   // Implement rate limiting logic here
   next();
 };
