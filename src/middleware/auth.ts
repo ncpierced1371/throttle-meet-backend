@@ -14,7 +14,6 @@ export interface AuthenticatedRequest extends Request {
     role?: string;
     [key: string]: any;
   };
-  id?: string;
 }
 
 // AuthenticatedRequest interface extends Express Request with required user property
