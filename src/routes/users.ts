@@ -6,7 +6,9 @@ import { asyncHandler } from '../middleware/errorHandler';
 const router = Router();
 
 // Get current user profile
-router.get('/profile', asyncHandler(async (req, res) => {
+import { Request, Response } from 'express';
+
+router.get('/profile', asyncHandler(async (req: Request, res: Response) => {
   // TODO: Implement user profile retrieval
   res.json({
     success: true,
@@ -24,7 +26,7 @@ router.put('/profile', [
   body('carModel').optional().trim().isLength({ max: 50 }),
   body('carYear').optional().isInt({ min: 1900, max: new Date().getFullYear() + 2 }),
   validateRequest
-], asyncHandler(async (req, res) => {
+], asyncHandler(async (req: Request, res: Response) => {
   // TODO: Implement user profile update
   res.json({
     success: true,
