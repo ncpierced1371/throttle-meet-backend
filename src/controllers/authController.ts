@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+import { signAccessToken, signRefreshToken, verifyToken } from '../lib/jwt';
 import { config } from '../config/config';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -21,21 +21,17 @@ class AuthController {
         isNewUser: true
       };
 
-      // Generate JWT tokens - Fix: Separate payload and options
-      const accessToken = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email,
-          role: 'user'
-        },
+      // Generate JWT tokens using jose helpers
+      const accessToken = await signAccessToken(
+        { userId: user.id, email: user.email, role: 'user' },
         String(config.jwt.secret),
-        { expiresIn: config.jwt.expiresIn }
+        15 // minutes
       );
 
-      const refreshToken = jwt.sign(
+      const refreshToken = await signRefreshToken(
         { userId: user.id },
         String(config.jwt.secret),
-        { expiresIn: config.jwt.refreshExpiresIn }
+        30 // days
       );
 
       logger.info(`Apple sign-in successful for user: ${user.email}`);
@@ -72,21 +68,17 @@ class AuthController {
         isNewUser: true
       };
 
-      // Generate JWT tokens - Fix: Separate payload and options
-      const jwtToken = jwt.sign(
-        { 
-          userId: user.id, 
-          email: user.email,
-          role: 'user'
-        },
+      // Generate JWT tokens using jose helpers
+      const jwtToken = await signAccessToken(
+        { userId: user.id, email: user.email, role: 'user' },
         String(config.jwt.secret),
-        { expiresIn: config.jwt.expiresIn }
+        15 // minutes
       );
 
-      const refreshToken = jwt.sign(
+      const refreshToken = await signRefreshToken(
         { userId: user.id },
         String(config.jwt.secret),
-        { expiresIn: config.jwt.refreshExpiresIn }
+        30 // days
       );
 
       logger.info(`Facebook sign-in successful for user: ${user.email}`);
@@ -127,17 +119,14 @@ class AuthController {
     const { refreshToken } = req.body;
 
     try {
-      // Verify refresh token
-      const decoded = jwt.verify(refreshToken, String(config.jwt.secret)) as any;
+      // Verify refresh token using jose
+      const decoded = await verifyToken(refreshToken, String(config.jwt.secret));
 
-      // Generate new access token - Fix: Separate payload and options
-      const accessToken = jwt.sign(
-        { 
-          userId: decoded.userId,
-          role: 'user'
-        },
+      // Generate new access token using jose
+      const accessToken = await signAccessToken(
+        { userId: decoded.userId, role: 'user' },
         String(config.jwt.secret),
-        { expiresIn: config.jwt.expiresIn }
+        15 // minutes
       );
 
       res.status(200).json({
