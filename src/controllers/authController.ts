@@ -28,13 +28,13 @@ class AuthController {
           email: user.email,
           role: 'user'
         },
-        config.jwt.secret,
+        String(config.jwt.secret),
         { expiresIn: config.jwt.expiresIn }
       );
 
       const refreshToken = jwt.sign(
         { userId: user.id },
-        config.jwt.secret,
+        String(config.jwt.secret),
         { expiresIn: config.jwt.refreshExpiresIn }
       );
 
@@ -79,13 +79,13 @@ class AuthController {
           email: user.email,
           role: 'user'
         },
-        config.jwt.secret,
+        String(config.jwt.secret),
         { expiresIn: config.jwt.expiresIn }
       );
 
       const refreshToken = jwt.sign(
         { userId: user.id },
-        config.jwt.secret,
+        String(config.jwt.secret),
         { expiresIn: config.jwt.refreshExpiresIn }
       );
 
@@ -128,7 +128,7 @@ class AuthController {
 
     try {
       // Verify refresh token
-      const decoded = jwt.verify(refreshToken, config.jwt.secret) as any;
+      const decoded = jwt.verify(refreshToken, String(config.jwt.secret)) as any;
 
       // Generate new access token - Fix: Separate payload and options
       const accessToken = jwt.sign(
@@ -136,7 +136,7 @@ class AuthController {
           userId: decoded.userId,
           role: 'user'
         },
-        config.jwt.secret,
+        String(config.jwt.secret),
         { expiresIn: config.jwt.expiresIn }
       );
 

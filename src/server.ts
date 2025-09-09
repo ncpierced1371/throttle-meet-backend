@@ -14,10 +14,10 @@ import { authMiddleware } from './middleware/auth';
 import { validateRequest } from './middleware/validation';
 
 // Import routes
-import authRoutes from './routes/auth';
+import { authRoutes } from './routes/auth';
 import userRoutes from './routes/users';
-import eventRoutes from './routes/events';
-import routeRoutes from './routes/routes';
+import { eventRoutes } from './routes/events';
+import { routeRoutes } from './routes/routes';
 import socialRoutes from './routes/social';
 import uploadRoutes from './routes/upload';
 
@@ -86,7 +86,7 @@ class ThrottleMeetServer {
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // Logging
-    if (config.nodeEnv !== 'test') {
+    if (config.NODE_ENV !== 'test') {
       this.app.use(morgan('combined', {
         stream: {
           write: (message: string) => logger.info(message.trim())
@@ -109,7 +109,7 @@ class ThrottleMeetServer {
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        environment: config.nodeEnv
+        environment: config.NODE_ENV
       });
     });
 
@@ -215,9 +215,9 @@ class ThrottleMeetServer {
     const host = config.host;
 
     this.server.listen(port, host, () => {
-      logger.info(`🚀 ThrottleMeet API server running on http://${host}:${port}`);
-      logger.info(`📝 Environment: ${config.nodeEnv}`);
-      logger.info(`🔗 Socket.IO enabled`);
+  logger.info(`🚀 ThrottleMeet API server running on http://${host}:${port}`);
+  logger.info(`📝 Environment: ${config.NODE_ENV}`);
+  logger.info(`🔗 Socket.IO enabled`);
     });
   }
 

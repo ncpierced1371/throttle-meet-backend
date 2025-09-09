@@ -1,1 +1,5 @@
-// Fastify provides a built-in logger via app.log. No custom logger needed.
+export const logger = {
+	info: (...args: any[]) => console.log('[INFO]', ...args),
+	error: (...args: any[]) => console.error('[ERROR]', ...args),
+	warn: (...args: any[]) => console.warn('[WARN]', ...args),
+};
