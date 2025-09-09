@@ -5,10 +5,11 @@ import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
+  user: {
     id: string;
     email: string;
     role?: string;
+    [key: string]: any;
   };
   id?: string;
 }
