@@ -1,9 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 
+
 import { verifyToken } from '../lib/jwt';
 import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
+
+// AuthenticatedRequest interface extends Express Request with required user property
+export interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    role?: string;
+    [key: string]: any;
+  };
+  id?: string;
+}
 
 // AuthenticatedRequest interface extends Express Request with required user property
 export interface AuthenticatedRequest extends Request {
