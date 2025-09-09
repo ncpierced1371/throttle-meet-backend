@@ -1,6 +1,3 @@
-import Redis from "ioredis";
-export let redis: Redis | null = null;
-
 import { Redis as UpstashRedis } from '@upstash/redis';
 
 let redis: UpstashRedis | null = null;
