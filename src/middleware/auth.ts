@@ -4,7 +4,6 @@ import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
 
-export interface AuthenticatedRequest extends Request {
   user: {
     id: string;
     email: string;
