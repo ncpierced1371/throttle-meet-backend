@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '../lib/jwt';
 import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
@@ -29,30 +29,26 @@ export const authMiddleware = async (
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token
-    const decoded = jwt.verify(token, config.jwt.secret) as any;
+    const decoded = await verifyToken(token, String(config.jwt.secret));
 
     // TODO: Fetch user from database and attach to request
     req.user = {
-      id: decoded.userId,
-      email: decoded.email,
-      role: decoded.role || 'user'
+      id: decoded.userId ? String(decoded.userId) : '',
+      email: decoded.email ? String(decoded.email) : '',
+      role: decoded.role ? String(decoded.role) : 'user'
     };
 
-    logger.info(`User authenticated: ${req.user.email}`, { 
-      userId: req.user.id,
-      requestId: req.id || 'unknown'
-    });
+    if (req.user) {
+      logger.info(`User authenticated: ${req.user.email}`, { 
+        userId: req.user.id,
+        requestId: req.id || 'unknown'
+      });
+    }
 
     next();
   } catch (error) {
     const err = error as Error;
-    if (err instanceof jwt.JsonWebTokenError) {
-      next(new AppError('Invalid access token', 401));
-    } else if (err instanceof jwt.TokenExpiredError) {
-      next(new AppError('Access token expired', 401));
-    } else {
-      next(error);
-    }
+  next(new AppError('Invalid or expired access token', 401));
   }
 };
 
@@ -66,12 +62,11 @@ export const optionalAuth = async (
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const token = authHeader.substring(7);
-      const decoded = jwt.verify(token, config.jwt.secret) as any;
-      
+      const decoded = await verifyToken(token, String(config.jwt.secret));
       req.user = {
-        id: decoded.userId,
-        email: decoded.email,
-        role: decoded.role || 'user'
+        id: decoded.userId ? String(decoded.userId) : '',
+        email: decoded.email ? String(decoded.email) : '',
+        role: decoded.role ? String(decoded.role) : 'user'
       };
     } catch (error) {
       // Ignore auth errors for optional auth
