@@ -9,7 +9,7 @@ import rateLimit from 'express-rate-limit';
 
 import { config } from './config/config.js';
 import { logger } from './utils/logger.js';
-import { errorHandler } from './middleware/errorHandler';
+import { errorHandler } from './middleware/errorHandler.js';
 import { authMiddleware } from './middleware/auth';
 import { validateRequest } from './middleware/validation';
 
