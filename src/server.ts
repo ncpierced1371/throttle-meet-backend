@@ -231,7 +231,9 @@ class ThrottleMeetServer {
 }
 
 // Start server if this file is run directly
-if (require.main === module) {
+
+// Start server unless in test environment
+if (process.env.NODE_ENV !== 'test') {
   const server = new ThrottleMeetServer();
   server.start();
 }
