@@ -16,11 +16,13 @@ export const generateToken = (payload: AuthPayload): string => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 };
 
-export const verifyToken = (token: string): AuthPayload => {
+export const verifyToken = (token: string): AuthPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
+    if (!payload.userId || !payload.email) return null;
+    return payload;
   } catch (error) {
-    throw new Error('Invalid token');
+    return null;
   }
 };
 
@@ -33,19 +35,4 @@ export const comparePassword = async (password: string, hashedPassword: string):
   return await bcrypt.compare(password, hashedPassword);
 };
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  try {
-    const payload = verifyToken(token);
-    (req as any).user = payload;
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid token' });
-  }
-};
+// authenticateToken middleware removed for Vercel endpoints

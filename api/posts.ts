@@ -1,14 +1,34 @@
-
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { query } from '../src/lib/database';
 import { setCache, getCache } from '../src/lib/redis';
-import { SocialPost, ApiResponse } from '../src/types';
+import { setCorsHeaders } from '../src/lib/cors';
+import { setSecurityHeaders } from '../src/lib/securityHeaders';
+import { checkRateLimit } from '../src/lib/rateLimit';
+import { logRequest, logError } from '../src/lib/logger';
+
+interface CreatePostRequest {
+  author_id: string;
+  content: string;
+  post_type?: string;
+  image_urls?: string[];
+  hashtags?: string[];
+  mentioned_users?: string[];
+  associated_event_id?: string;
+  associated_route_id?: string;
+  location_name?: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  setCorsHeaders(res);
+  setSecurityHeaders(res);
+  logRequest(req);
+
+  // Rate limiting: 60 requests per 10 min per IP for posts endpoints
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const rate = await checkRateLimit({ key: `posts:${ip}`, limit: 60, window: 600 });
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'Rate limit exceeded', reset: rate.reset });
+  }
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -29,24 +49,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('Posts API error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    logError(error, 'posts');
+    res.status(500).json({ success: false, error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
 
 async function handleGetPosts(req: VercelRequest, res: VercelResponse) {
-  const { 
-    postId, 
-    authorId, 
-    hashtag,
-    search,
-    limit = '20', 
-    offset = '0' 
-  } = req.query;
+  const { postId, authorId, hashtag, search, limit = '20', offset = '0' } = req.query as {
+    postId?: string;
+    authorId?: string;
+    hashtag?: string;
+    search?: string;
+    limit?: string;
+    offset?: string;
+  };
 
   if (postId) {
     // Get specific post with comments
@@ -135,25 +151,18 @@ async function handleGetPosts(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleCreatePost(req: VercelRequest, res: VercelResponse) {
-  const {
-    author_id,
-    content,
-    post_type = 'text',
-    image_urls = [],
-    hashtags = [],
-    mentioned_users = [],
-    associated_event_id,
-    associated_route_id,
-    location_name
-  } = req.body;
-
+  const body = req.body as CreatePostRequest;
+  const { author_id, content, post_type = 'text', image_urls = [], hashtags = [], mentioned_users = [], associated_event_id, associated_route_id, location_name } = body;
   if (!author_id || !content) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required fields: author_id, content'
-    });
+    return res.status(400).json({ success: false, error: 'Missing required fields: author_id, content' });
   }
-
+  // Content sanitization (basic XSS prevention)
+  const sanitizedContent = String(content).replace(/[<>]/g, '');
+  // Spam prevention: limit post length
+  if (sanitizedContent.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Post content too long' });
+  }
+  // TODO: Add more advanced spam detection if needed
   const result = await query(
     `INSERT INTO throttlemeet.social_posts (
       author_id, content, post_type, image_urls, hashtags, mentioned_users,
@@ -161,43 +170,35 @@ async function handleCreatePost(req: VercelRequest, res: VercelResponse) {
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *`,
     [
-      author_id, content, post_type, JSON.stringify(image_urls), 
+      author_id, sanitizedContent, post_type, JSON.stringify(image_urls),
       JSON.stringify(hashtags), JSON.stringify(mentioned_users),
       associated_event_id, associated_route_id, location_name
     ]
   );
-
   const newPost = result.rows[0];
-
-  // Update user's post count
-  await query(
-    'UPDATE throttlemeet.users SET post_count = post_count + 1 WHERE id = $1',
-    [author_id]
-  );
-
-  // Cache the new post
+  await query('UPDATE throttlemeet.users SET post_count = post_count + 1 WHERE id = $1', [author_id]);
   await setCache(`post:${newPost.id}`, newPost, 300);
-
-  res.status(201).json({
-    success: true,
-    data: newPost
-  });
+  res.status(201).json({ success: true, data: newPost });
 }
 
 async function handleUpdatePost(req: VercelRequest, res: VercelResponse) {
-  const { postId } = req.query;
-  const updates = req.body;
-
+  const { postId } = req.query as { postId?: string };
+  const body = req.body as Partial<CreatePostRequest>;
   if (!postId) {
     return res.status(400).json({ success: false, error: 'Post ID required' });
   }
+  // Content sanitization
+  if (body.content && String(body.content).length > 2000) {
+    return res.status(400).json({ success: false, error: 'Post content too long' });
+  }
+  const sanitizedContent = body.content ? String(body.content).replace(/[<>]/g, '') : undefined;
 
   // Build dynamic update query
-  const setClause = Object.keys(updates)
+  const setClause = Object.keys(body)
     .map((key, index) => `${key} = $${index + 2}`)
     .join(', ');
 
-  const values = [postId, ...Object.values(updates)];
+  const values = [postId, ...Object.values(body)];
 
   const result = await query(
     `UPDATE throttlemeet.social_posts SET ${setClause}, updated_at = NOW() 
@@ -218,8 +219,7 @@ async function handleUpdatePost(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleDeletePost(req: VercelRequest, res: VercelResponse) {
-  const { postId } = req.query;
-
+  const { postId } = req.query as { postId?: string };
   if (!postId) {
     return res.status(400).json({ success: false, error: 'Post ID required' });
   }

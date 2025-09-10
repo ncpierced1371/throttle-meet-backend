@@ -1,14 +1,34 @@
-
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { query } from '../src/lib/database';
 import { setCache, getCache } from '../src/lib/redis';
-import { Event, ApiResponse } from '../src/types';
+import { setCorsHeaders } from '../src/lib/cors';
+import { setSecurityHeaders } from '../src/lib/securityHeaders';
+import { checkRateLimit } from '../src/lib/rateLimit';
+import { logRequest, logError } from '../src/lib/logger';
+
+interface CreateEventRequest {
+  title: string;
+  description: string;
+  rally_type: string;
+  start_date: string;
+  end_date: string;
+  location: { lat: number; lng: number };
+  max_participants: number;
+  requirements?: Record<string, any>;
+  organizer_id: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  setCorsHeaders(res);
+  setSecurityHeaders(res);
+  logRequest(req);
+
+  // Rate limiting: 30 requests per 10 min per IP for events endpoints
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const rate = await checkRateLimit({ key: `events:${ip}`, limit: 30, window: 600 });
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'Rate limit exceeded', reset: rate.reset });
+  }
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -29,168 +49,103 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('Events API error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    logError(error, 'events');
+    res.status(500).json({ success: false, error: 'Internal server error', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
 
 async function handleGetEvents(req: VercelRequest, res: VercelResponse) {
-  const { 
-    eventId, 
-    organizerId, 
-    rallyType, 
-    status = 'upcoming',
-    limit = '20', 
-    offset = '0',
-    search
-  } = req.query;
-
+  const { eventId, organizerId, nearLat, nearLng, radius = '50', limit = '20', offset = '0' } = req.query as {
+    eventId?: string;
+    organizerId?: string;
+    nearLat?: string;
+    nearLng?: string;
+    radius?: string;
+    limit?: string;
+    offset?: string;
+  };
+  // Location-based query optimization
   if (eventId) {
-    // Get specific event
-    const cacheKey = `event:${eventId}`;
-    let event = await getCache(cacheKey);
-
+    let event = await getCache(`event:${eventId}`);
     if (!event) {
-      const result = await query(
-        `SELECT e.*, u.display_name as organizer_name 
-         FROM throttlemeet.events e 
-         LEFT JOIN throttlemeet.users u ON e.organizer_id = u.id 
-         WHERE e.id = $1`,
-        [eventId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'Event not found' });
-      }
-
+      const result = await query('SELECT * FROM throttlemeet.events WHERE id = $1', [eventId]);
       event = result.rows[0];
-      await setCache(cacheKey, event, 600); // Cache for 10 minutes
+      await setCache(`event:${eventId}`, event, 300);
     }
-
-    return res.status(200).json({ success: true, data: event });
+    return res.status(200).json({ success: true, event });
   }
-
-  // Get multiple events with filters
-  let queryText = `
-    SELECT e.*, u.display_name as organizer_name,
-           COUNT(er.id) as registration_count
-    FROM throttlemeet.events e 
-    LEFT JOIN throttlemeet.users u ON e.organizer_id = u.id
-    LEFT JOIN throttlemeet.event_registrations er ON e.id = er.event_id AND er.status = 'registered'
-    WHERE 1=1
-  `;
-  const params: any[] = [];
-
+  if (nearLat && nearLng) {
+    // Find events within radius (km) using PostGIS
+    const result = await query(
+      `SELECT *, ST_Distance(location, ST_MakePoint($1, $2)::geography) AS distance
+       FROM throttlemeet.events
+       WHERE ST_DWithin(location, ST_MakePoint($1, $2)::geography, $3 * 1000)
+       ORDER BY distance ASC
+       LIMIT $4 OFFSET $5`,
+      [nearLng, nearLat, radius, limit, offset]
+    );
+    return res.status(200).json({ success: true, events: result.rows });
+  }
+  // Organizer events
   if (organizerId) {
-    queryText += ` AND e.organizer_id = $${params.length + 1}`;
-    params.push(organizerId);
+    const result = await query('SELECT * FROM throttlemeet.events WHERE organizer_id = $1 LIMIT $2 OFFSET $3', [organizerId, limit, offset]);
+    return res.status(200).json({ success: true, events: result.rows });
   }
-
-  if (rallyType) {
-    queryText += ` AND e.rally_type = $${params.length + 1}`;
-    params.push(rallyType);
+  // Popular events (cache)
+  let events = await getCache('events:popular');
+  if (!events) {
+    const result = await query('SELECT * FROM throttlemeet.events ORDER BY start_date DESC LIMIT $1 OFFSET $2', [limit, offset]);
+    events = result.rows;
+    await setCache('events:popular', events, 300);
   }
-
-  if (status) {
-    queryText += ` AND e.status = $${params.length + 1}`;
-    params.push(status);
-  }
-
-  if (search) {
-    queryText += ` AND (e.title ILIKE $${params.length + 1} OR e.description ILIKE $${params.length + 1})`;
-    params.push(`%${search}%`);
-  }
-
-  queryText += `
-    GROUP BY e.id, u.display_name
-    ORDER BY e.start_date ASC
-    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-  `;
-  params.push(parseInt(limit as string), parseInt(offset as string));
-
-  const result = await query(queryText, params);
-
-  // Cache the results
-  const cacheKey = `events:${JSON.stringify(req.query)}`;
-  await setCache(cacheKey, result.rows, 300); // Cache for 5 minutes
-
-  res.status(200).json({
-    success: true,
-    data: result.rows,
-    meta: {
-      total: result.rowCount,
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string)
-    }
-  });
+  return res.status(200).json({ success: true, events });
 }
 
 async function handleCreateEvent(req: VercelRequest, res: VercelResponse) {
-  const {
-    title,
-    description,
-    organizer_id,
-    rally_type,
-    start_date,
-    end_date,
-    location_name,
-    location_address,
-    max_participants,
-    entry_fee = 0,
-    is_public = true,
-    requires_approval = false
-  } = req.body;
-
-  if (!title || !organizer_id || !rally_type) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required fields: title, organizer_id, rally_type'
-    });
+  const body = req.body as CreateEventRequest;
+  const { title, description, rally_type, start_date, end_date, location, max_participants, requirements = {}, organizer_id } = body;
+  if (!title || !description || !rally_type || !start_date || !end_date || !location || !max_participants || !organizer_id) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
-
+  // Basic input validation
+  if (title.length > 100 || description.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Title/description too long' });
+  }
+  if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+    return res.status(400).json({ success: false, error: 'Invalid location' });
+  }
+  // Create event
   const result = await query(
     `INSERT INTO throttlemeet.events (
-      title, description, organizer_id, rally_type, start_date, end_date,
-      location_name, location_address, max_participants, entry_fee,
-      is_public, requires_approval
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      title, description, rally_type, start_date, end_date, location, max_participants, requirements, organizer_id
+    ) VALUES ($1, $2, $3, $4, $5, ST_MakePoint($6, $7)::geography, $8, $9, $10)
     RETURNING *`,
-    [
-      title, description, organizer_id, rally_type, start_date, end_date,
-      location_name, location_address, max_participants, entry_fee,
-      is_public, requires_approval
-    ]
+    [title, description, rally_type, start_date, end_date, location.lng, location.lat, max_participants, requirements, organizer_id]
   );
-
   const newEvent = result.rows[0];
-
-  // Cache the new event
-  await setCache(`event:${newEvent.id}`, newEvent, 600);
-
-  res.status(201).json({
-    success: true,
-    data: newEvent
-  });
+  await setCache(`event:${newEvent.id}`, newEvent, 300);
+  res.status(201).json({ success: true, data: newEvent });
 }
 
 async function handleUpdateEvent(req: VercelRequest, res: VercelResponse) {
-  const { eventId } = req.query;
-  const updates = req.body;
-
+  const { eventId } = req.query as { eventId?: string };
+  const body = req.body as Partial<CreateEventRequest>;
   if (!eventId) {
     return res.status(400).json({ success: false, error: 'Event ID required' });
   }
-
+  // Basic input validation
+  if (body.title && body.title.length > 100) {
+    return res.status(400).json({ success: false, error: 'Title too long' });
+  }
+  if (body.description && body.description.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Description too long' });
+  }
   // Build dynamic update query
-  const setClause = Object.keys(updates)
+  const setClause = Object.keys(body)
     .map((key, index) => `${key} = $${index + 2}`)
     .join(', ');
 
-  const values = [eventId, ...Object.values(updates)];
+  const values = [eventId, ...Object.values(body)];
 
   const result = await query(
     `UPDATE throttlemeet.events SET ${setClause}, updated_at = NOW() 
@@ -211,8 +166,7 @@ async function handleUpdateEvent(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleDeleteEvent(req: VercelRequest, res: VercelResponse) {
-  const { eventId } = req.query;
-
+  const { eventId } = req.query as { eventId?: string };
   if (!eventId) {
     return res.status(400).json({ success: false, error: 'Event ID required' });
   }
