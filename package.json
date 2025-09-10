@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "throttlemeet-backend",
   "version": "1.0.0",
   "description": "ThrottleMeet Backend API - Automotive Social Platform",
