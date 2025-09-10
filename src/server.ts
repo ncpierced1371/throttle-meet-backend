@@ -14,12 +14,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { validateRequest } from './middleware/validation';
 
 // Import routes
-import { authRoutes } from './routes/auth.js';
-import userRoutes from './routes/users.js';
-import { eventRoutes } from './routes/events.js';
-import { routeRoutes } from './routes/routes.js';
-import socialRoutes from './routes/social';
-import uploadRoutes from './routes/upload';
+// Removed all route imports for minimal setup
 
 // Extend Request type
 declare module 'express-serve-static-core' {
@@ -103,30 +98,13 @@ class ThrottleMeetServer {
   }
 
   private setupRoutes(): void {
-    // Health check
+    // Minimal health check route only
     this.app.get('/health', (req, res) => {
       res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: config.NODE_ENV
-      });
-    });
-
-    // API routes
-    this.app.use('/api/v1/auth', authRoutes);
-    this.app.use('/api/v1/users', authMiddleware, userRoutes);
-    this.app.use('/api/v1/events', authMiddleware, eventRoutes);
-    this.app.use('/api/v1/routes', authMiddleware, routeRoutes);
-    this.app.use('/api/v1/social', authMiddleware, socialRoutes);
-    this.app.use('/api/v1/upload', authMiddleware, uploadRoutes);
-
-    // 404 handler for unknown routes
-    this.app.use('*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        path: req.originalUrl
       });
     });
   }
