@@ -14,7 +14,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { validateRequest } from './middleware/validation';
 
 // Import routes
-import { authRoutes } from './routes/auth';
+import { authRoutes } from './routes/auth.js';
 import userRoutes from './routes/users';
 import { eventRoutes } from './routes/events';
 import { routeRoutes } from './routes/routes';
