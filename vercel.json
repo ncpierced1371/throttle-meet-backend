@@ -3,7 +3,9 @@
   "builds": [
     { "src": "src/server.ts", "use": "@vercel/node" }
   ],
-  "routes": [
-    { "src": "/(.*)", "dest": "src/server.ts" }
+  "rewrites": [
+    { "source": "/", "destination": "/api" },
+    { "source": "/favicon.ico", "destination": "/api/favicon.ico" },
+    { "source": "/favicon.png", "destination": "/api/favicon.png" }
   ]
 }
