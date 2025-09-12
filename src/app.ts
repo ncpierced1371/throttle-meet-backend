@@ -9,7 +9,6 @@ import { profileRoutes } from "./routes/profiles.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js"; // Ensure named export
 import { eventRoutes } from "./routes/events.js"; // Ensure named export
-import { routeRoutes } from "./routes/routes.js"; // Ensure named export
 import { mediaRoutes } from "./routes/media.js";
 
 export function buildApp() {
@@ -29,7 +28,6 @@ export function buildApp() {
   app.register(authRoutes);
   app.register(profileRoutes);
   app.register(eventRoutes);
-  app.register(routeRoutes);
   app.register(mediaRoutes);
 
 
@@ -37,6 +35,11 @@ export function buildApp() {
   app.get('/favicon.ico', async (req, reply) => {
     reply.code(204).send();
   });
+
+    // Handle /favicon.png requests to prevent 404s
+    app.get('/favicon.png', async (req, reply) => {
+      reply.code(204).send();
+    });
 
   // Handle root requests to prevent 504 timeouts
   app.get('/', async () => ({

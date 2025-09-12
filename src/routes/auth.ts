@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { signAccessToken, signRefreshToken, verifyToken } from "../lib/jwt";
+import { signAccessToken, signRefreshToken, verifyToken } from "../lib/jwt.js";
 
 // Super-light in-memory “user directory” just for local dev.
 // Key = userId, Value = basic profile bits to surface in /me.

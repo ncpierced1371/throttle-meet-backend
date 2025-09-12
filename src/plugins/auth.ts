@@ -1,7 +1,7 @@
 
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { verifyToken } from "../lib/jwt";
+import { verifyToken } from "../lib/jwt.js";
 
 declare module "fastify" {
   interface FastifyRequest {
