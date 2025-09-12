@@ -164,11 +164,24 @@ async function handleSignup(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleAppleSignIn(req: VercelRequest, res: VercelResponse) {
-  const body = req.body as AppleSignInRequest;
-  const { apple_user_id, email, display_name, first_name, last_name } = body;
-  if (!apple_user_id) {
-    return res.status(400).json({ success: false, error: 'Apple User ID required' });
+  const body = req.body as { identityToken: string };
+  const { identityToken } = body;
+  if (!identityToken) {
+    return res.status(400).json({ success: false, error: 'Apple identity token required' });
   }
+  // Verify Apple identity token
+  let applePayload;
+  try {
+    const { verifyAppleToken } = await import('../src/lib/appleAuth');
+    applePayload = await verifyAppleToken(identityToken);
+  } catch (err) {
+    return res.status(401).json({ success: false, error: 'Invalid Apple identity token', details: err instanceof Error ? err.message : err });
+  }
+  const apple_user_id = applePayload.sub;
+  const email = applePayload.email;
+  const display_name = applePayload.email || 'Apple User';
+  const first_name = null;
+  const last_name = null;
   let result = await query('SELECT * FROM throttlemeet.users WHERE apple_user_id = $1', [apple_user_id]);
   let user;
   if (result.rows.length === 0) {

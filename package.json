@@ -17,6 +17,7 @@
     "@prisma/client": "^6.15.0",
     "@types/pg": "^8.15.5",
     "@upstash/redis": "^1.22.0",
+    "apple-signin-auth": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.7.0",
     "compression": "^1.8.1",
