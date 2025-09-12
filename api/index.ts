@@ -15,6 +15,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(204).end();
     return;
   }
+  if (req.url === "/favicon.png" || req.url === "/api/favicon.png") {
+    res.status(204).end();
+    return;
+  }
   // Ensure Fastify is ready
   await app.ready();
   // Let Fastify handle the Node req/res
