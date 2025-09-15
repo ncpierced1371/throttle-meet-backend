@@ -1,8 +1,0 @@
-{
-  "name": "minimal-test",
-  "version": "1.0.0",
-  "dependencies": {
-    "@types/busboy": "^1.5.4",
-    "busboy": "^1.6.0"
-  }
-}
